@@ -1,0 +1,314 @@
+---
+title: "Assignment 4 - Capstone"
+author: "David Griffith"
+date: "28 August 2019"
+output: html_document
+---
+
+## Libraries used in this report are as follows:
+
+```{r results='hide', message=FALSE, warning=FALSE}
+
+# Libraries
+library(ggplot2)
+library(class)
+library(naivebayes)
+library(psych)
+library(dplyr)
+library(reshape2)
+library(ggplot2)
+library (MASS)
+library(dendextend)
+library(knitr)
+library(kableExtra)
+library(dbscan)
+library(factoextra)
+
+```
+
+### Purpose of the report: 
+The purpose of this report is to analyse customer data to understand what clusters are apparent and to see whether the Naive Bayes classification model can assist in predicting which families are likely to want to purchase an additional day. This will ultimately allow for 'X' to work in a more efficient way by targeting the right families.
+
+### Methodological approach: 
+The initial approach was to perform Exploratory Analysis on the dataset. This involved importing the data into R Studio and plotting the data to identify the frequency at which additional days had or had not been purchased using the base R functions. As computing power is restricted a simple random sample was taken from the priginal dataset for analysis. this was completed using the base sample() function. Once the data was imported, sampled and frequency was plotted, data type conversion was executed so that hierarchical & k-means clustering analysis could be undertaken. 
+
+Once the qualitative data was converted to quantitative, NA's were removed and dummy code variables were created as separate data frames using the psych package (Revelle, W. (2018)). These data frames were then bound to the original dataset and using dplyr (Wickham, H., Francois, R., Henry, L. & Muller K, 2019) the original columns for which the dummy codes were created were removed.
+
+As the data was now a matrix clustering using the base stats package was executed using the complete linkage and wards methods. Normalisation on the data was also completed and the clustering algorithms were run again for comparison between the two datasets. The Silhouette Width Criterion was then calculated and the output used to determine **K** in the k-Means clustering.
+
+The classification method naivebayes was then executed using the package naivebayes (Majka M (2019)) with a feature selection wrapper to see if model efficiency could be increased.
+
+### Findings or Achievements: 
+While performing clustering analysis on the dataset it was apparent that there were clear clusters within the data. Both Ward's algorithm and complete linkage showed 2 clear partitions within the data clustering as demonstrated by the colours in the dendrogram's. The naivebayes classifier demonstrated which predictors would be most useful in a forward feature selection wrapper. The test error rate of the model was **0.136** with 2 predictors and was **0.14** with 5. More will be discussed in the results aobut the naive bayes classifier.
+
+### Conclusions and Implications: 
+The clustering shows that there is clear segmentation within the data which could be analysed further to understand how 'X' can use this information. The naivebayes classifier had reasonable performance from the wrapper however further analysis for cross validating and AUC-ROC would need to be undertaken preio to using in production. The signs are positive that this analysis should be continued. The implications to the business could mean that if families are misclassified that they would not accept an additional day then it is potentially a family that isn't called and lost revenue to the business. 
+
+## Introduction: 
+With the latest Child Care Subsidy legislation changes there have been some drastic changes in the way that the government subsidises childcare across Australia. 'X' childcare organisation with over 50k children in care every day. 'X' currently has a centralised call centre in which they run various marketing campaigns through, such as upselling additional days to existing families. 'X' is looking at machine learning to see if it can assist with improved data segmentation and classification so that resources can be targeting families in the most efficient way possible. 
+
+## Data: 
+The dataset sourced is operational booking data from within the 'X' data warehouse from the 01/05/2018 to 20/08/2019. 
+
+The sample size of the dataset is 32,899 customer observations who are both Active and Inactive within the 'X' Education environment.
+
+```{r}
+
+dt <- read.csv("data-types.csv")
+kable(dt) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F)
+
+```
+
+### Interventions and/or pre-processing:
+Target variable data has been joined to customer data which has been captured as an outcome from the 'X' call centre. This data was accessed through the data warehouse and an inner join was made on child Id to link the data together.
+
+### Other information: 
+The data in this report is a mixture of operational and and customer data which has been captured within the 'X' data warehouse through activities such as NPS surveying. 
+
+### Methods: 
+As the initial dataset was in the format of a CSV the data needed to be imported into an application in which data analysis could be undertaken. The program of choice was R Studio version 1.1.463 (RStudio Team, 2016). As i have limited processing power on my home laptop a simple random sample of 2000 observations was taken using the base sample() function. Using the sample, a copy was made and stored in a data frame so that na?ve bayes could be performed on the original categorical data. Class labels were then also stored in a vector as to separate them for supervised classification later on. 
+
+Once the data was loaded a frequency table was created and plotted to understand whether the target variable was symmetrical or not. 
+
+```{r}
+
+# Create a pie chart to view split of additional day variable
+
+diagnosis.prop.table <- prop.table(diagnosis.table)*100
+diagnosis.prop.df <- as.data.frame(diagnosis.prop.table)
+pielabels <- sprintf("%s - %3.1f%s", diagnosis.prop.df[,1], diagnosis.prop.table, "%")
+# plot pie
+pie(diagnosis.prop.table,
+    labels=pielabels,  
+    clockwise=TRUE,
+    col=col,
+    border="gainsboro",
+    radius=0.8,
+    cex=0.8, 
+    main="Frequency of additional day purchased")
+legend(1, .4, legend=diagnosis.prop.df[,1], cex = 0.7, fill = col)
+
+```
+
+As clustering was going to be performed on the data, data type conversion was required. The process to convert this was as follows:
+
+1. Convert variables that were currently incorrectly stored as factors to integers
+2. Convert any factors with 2 levels to integers
+3. Remove any NA's introduced by the data type conversion
+4. Create dummy code variables for variables that have more than 3 levels. These were added to their own data frames which were then bound to the original dataset.
+5. With dplyr (Wickham, H., Francois, R., Henry, L. & Muller K, (2019)) remove the original variables from the data as now each factor level had its own column.
+
+Still xploring the data a  pairwise pearson correlation similarity matrix & heatmap was created to visualise any pairwise correlations within the data.
+
+
+## Hierarchical Clustering with Complete Linkage & Ward's
+
+As hierarchical clustering was going to be performed on both normalised and original data a new dataframe was created with normalised data, the base r function scale() was used to perform this.
+
+
+Hiararchical Clustering was performed on the original data. A distance matrix using euclidean distance was created and then used for both the complete linkage and Ward's methods. The denextend package Galili, T. (2015) was used to add colour to the dendrogram. Once completed this was actioned on the normalised data also.
+
+
+## K-means Clustering Analysis with Silhouette Width Criterion Evaluation
+
+Using the factoextra package SWC & total within Sum of Squares was calculated to determine the best value for K
+
+```{r}
+
+# calculate and plot SWC & TWSS for K value
+
+fviz_nbclust(data.norm, kmeans, method = "wss") +
+  geom_vline(xintercept = 3, linetype = 2)
+
+fviz_nbclust(data.norm, kmeans, method = "silhouette")
+
+
+```
+
+As there were two values based on the TSSW and SWC approaches i decided to use the largest number of 3 for K. K-means was then calculated and a table created to see observations per cluster by classification
+
+```{r}
+
+# perform k-means
+
+data.km <- kmeans(x = data.norm[2:55], centers = 3, nstart = 10)
+data.norm$cluster <- as.factor(data.km$cluster)
+
+
+# table of observations per cluster by classification
+
+data.class <- data.norm$booking
+table(data.km$cluster,data.class)
+
+```
+
+
+
+### Supervised learning- Vaive Bayes Classification
+
+As the purpose states above *"Naive Bayes classification model can assist in predicting which families are likely to want to purchase an additional day. This will ultimately allow for 'X' to work in a more efficient way by targeting the right families."* A forward feature selection wrapper was also implemented to see if the model could be just as accurate with only a subset of predictors. 
+
+## Results & Discussions
+
+
+### Pearsons Correlation
+
+Plotting pearsons correlation measure in a heatmap we are able to see any pairwise correlations between the varaiables within the data. Specifically focussing on the booking variable to see if there are any correlations with it and any other variables. As you can see there doesn't seem to be any as there are no light boxes along either of the axis. There is some some levels of high correlation between CCS_Percentage and low income, this is to be expected due to the way government subsidies are calculated. We also have correlation between NPS results and varios commitment levels which also makes sense. CCS Total Hours per fortnight and Both parents working also have high correlation.
+
+```{r}
+
+# plot correlation matrix in heatmap
+
+ggplot(data = melted.cormat, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+
+## Hierarchical Clustering
+
+### Dendrograms for complete Linkage on normalised & original data {.tabset}
+
+### Original
+
+What we Can observe here is that there are 2 partitions with the data as demonstrated by the height in which the clusters are separated. These have been colour coded to enhance the visual. Inside each of these partitions there is further clustering of observations which have a high dissimilarity value due to the height between these also. The green cluster has more of this than the red. There are a total of 1949 observations and the total heght of the dendrogram is 1071.173.In the leafs of the plot it is evident that there is high similarity between these as noted by the height of the cluster linkage lines.
+
+
+```{r}
+
+cl.dend %>% set("branches_k_color", k = 2) %>% plot(main = "Complete Linkage Original")
+cl.dend
+
+
+```
+
+### Normalised
+
+What we can see with the normalised data is that all clustering disappears and the dendrogram has a flat structure. This has obviously had a negative effect to the clustering using this method.
+
+
+```{r}
+
+
+cl.dend.norm %>% set("branches_k_color", k = 2) %>% plot(main = "Complete Linkage Normalised")
+cl.dend.norm
+
+```
+
+
+### Dendrograms for Ward's alrorith on normalised & original data {.tabset}
+
+### Original
+
+Looking at the clustering performed by the Ward's method there are similarities with complete linkage. The data has been segmented into two clear clusters which have significant dissimilarity between them. One thing to be aware of when vieiwng is the different scales of the dendrograms. Performing a simple mean calculation on the average height between observations the complete linkage clustering method had a lower height which could be used to assume higher similarity in observations. Further analysis outside the scope of this report would need to be undertaken to further investigate this though.
+
+```{r}
+
+
+ward.dend %>% set("branches_k_color", k = 2) %>%
+              set("labels", data.class) %>% plot(main = "Ward's Clustering Algorithm Original")
+ward.dend
+
+
+mean(cl.orig$height)
+mean(ward.orig$height)
+
+```
+
+### Normalised
+
+As with the complete linkage clustering method the normalisation has had an adverse effect on the clustering of the data using Ward's
+
+```{r}
+
+ward.dend.norm %>% set("branches_k_color", k = 2) %>% plot(main = "Ward's Clustering Algorithm Normalised")
+ward.dend.norm
+
+```
+
+## K-means clustering
+
+### Silhouette Width Criterion & Total Within Sum of Squares
+
+The results of the SWC and TWSS calculates provided output values of 2 and 3 respectively. I decided to use the highest number of 3 to then calculate the k-means on the data. 
+
+```{r}
+
+# calculate and plot SWC & TWSS for K value
+
+fviz_nbclust(data.norm, kmeans, method = "wss") +
+  geom_vline(xintercept = 3, linetype = 2)
+
+fviz_nbclust(data.norm, kmeans, method = "silhouette")
+
+```
+
+
+### K-means
+
+Printing the results of the k-means we are able to see that 3 clusters were created with 31, 1170 & 748 observations in each cluster. I also plotted NPS scores against parent commitment level against the assigned cluster index from the k-means which proved inconclusive clustering of the data against those variables. The WSS is 14.7% which also demonstrates that the k-means isn't a good model for this dataset and that additional analysis should be undertaken with different clustering methods that are more suited to data with equal densities.
+
+```{r}
+
+# plot NPS & Commitment level
+
+ggplot() + geom_point(aes(x = NPS, y = Committment_Level , colour = as.factor(cluster)),data = data.norm)
+
+
+print(data.km)
+
+
+```
+
+
+## Naive Bayes Classification
+
+The Naive bayes classification model produced an average error rate of:
+```{r}
+plot(Test_Error) # finally plot the error rates
+mean(Test_Error)
+```
+
+this sounds positive, lets look further at a confusion matrix to understand true positive rates and false positive rates
+
+```{r}
+
+tab
+
+```
+
+
+We can see in the confusion matrix above that the true positive's for the classification is 320 and the true negative's are 7. False negative's are 22 and the false positives are 51. This means that the model classified 22 observations as addtional day families however based on the ground truth data they were families who didn't purchase an additional day. Likewise the model classified 51 families as not wanting an additional day however these should have been classified as additional day families. The True Positve, True Negative, False Positive and False Negative rates have been calculated below:
+
+
+```{r}
+
+tpr <- 320/(320+22)
+fpr <- 51/(51+7)
+tnr <- 7/(7+51)
+fnr <- 22/(22+320)
+
+model.performance <- cbind(c("tpr","fpr","tnr","fnr"),c(tpr,fpr,tnr,fnr))
+as.data.frame(model.performance)
+
+```
+
+
+The model itself doesn't perform very well as the FPR is extremely high. Currently its at **88%** which leaves a large margin to for error in terms of classifying families not to approach for additional days.
+
+
+# Conclusions
+
+The extent of this report included pearsons correlation, clustering analysis of partitional based algorithms in k-means and hierarchical based clustering with complete linkage and Ward's. The results of those methods proved inconclusive and while clusters are prevelant in the data there seems to be similarity within the data clusters which dont seem to be useful. The naive bayes classifier also didn't perform overly well with classification due to the impact of classification on the true negative rate meaning that families are potentially not approached for additional days. This could have higher impacts on the business than using the current model of sequentially calling our families. 
+
+I conclude that further analysis and different moethods should be applied to understand if classification can be made on this data. 
+
+
+# code Appendix
+
+```{r code = readLines(knitr::purl("C:/Users/David/OneDrive/University/Data Mining/Assessment 4 - Capstone project/griffith_david_capstonev2.R", documentation = 1))} 
+
+
+```
