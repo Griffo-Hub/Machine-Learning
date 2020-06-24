@@ -1,0 +1,303 @@
+# Part II: An application
+
+### 2.2.1 - Select a random sample of 70% of the full dataset as the training data, retain the rest as test data. Provide the code and print out the dimensions of the training data.
+
+We will first load the data into R and do some basic exploration and manipulation of the response variable to make it clearer.
+
+```{r}
+library("readxl")
+
+
+setwd("C:/Users/david/OneDrive/University/Data Mining and Machine Learning/Assessment 2")
+credit_df <- read_excel("CreditCard_Data.xls", col_names = TRUE)
+
+# Prep data for modelling
+
+str(credit_df)
+
+# rename response variable
+
+colnames(credit_df)[25] <- "default_outcome"
+
+# response variable as factor
+
+credit_df$default_outcome <- as.factor(credit_df$default_outcome)
+
+# Look for NA's
+
+apply(credit_df, 2, function(x) sum(is.na(x)))
+
+```
+
+
+We now create training and test indexes which can be used on the credit_df dataset. These indexes have been used multiple times throughout the markdown file for both tree based algorithms and support vectors.
+
+```{r}
+# 2.2.1
+
+# Split the data into a train and test sets
+
+no_observations <- dim(credit_df)[1] # No. observations (30,000)
+no_predictors <- dim(credit_df)[2] - 1 # No. predictors (24) = No. variables (23) - dependent var. (last column)
+
+# testindex a random sample of 30% of no_observations
+
+set.seed(101)
+test_index <- sample(no_observations, size=as.integer(no_observations*0.3), replace=FALSE) # 30% test index
+training_index <- -test_index # Remaining 70% data observations for training
+
+
+```
+
+
+## 2.2.2 Tree Based Algorithms
+
+### Use an appropriate tree based algorithms to classify credible and non-credible clients.Specify any underlying assumptions. Justify your model choice as well as hyper-parameters which are required to be specied in R to estimate the selected model.
+
+*No assumptions have been made for this model*
+
+discuss random forests here
+
+We will first prepare the data for modelling by removing the ID variable within the data frame. We will also add the $randomForest$ and $tree$ libraries which contain algorithms which we will use for our tree based classification. 
+
+
+```{r}
+
+require(randomForest)
+library(tree)
+
+# Prep data for modelling
+
+# remove ID variable
+
+credit_df_carts <- credit_df[,-1]
+credit_df_carts <- data.frame(credit_df_carts)
+
+```
+
+There are several options for chosing tree based machine learning algorithms. Decision trees are easy to build and easy to interpret however they aren't the most accurate model and are prone to overfitting. There are methods such as pruning which assist in avoiding overfitting however another model choice was chosen for this assignment. 
+
+Random Forests combine the simplicity and easy inrepretability of a decision tree with flexibility which usually results in a increased accuracy in classification. Random forests uses a concept called bootstrapped aggregation (bagging) which essentially creates a subset of data in which the decision tree algorithm is executed on, using a subset of input variables at each step. With the subset of data there are observations which are not included in the tree creation and are therefore called *Out of Bag samples*. These observations are what is then used to test the *Out of Bag (OOB)* error rate. Once this tree is created the process then repeats itself again and again. 
+
+Once the trees are created, a new observation is classified by running it through all decision trees (random forest), and the classification with the highest count will be selected. The variability in the trees is what gives the random forest a higher accuracy than a single decision tree. 
+
+One model tuning parameter $mtry$ is defined as the number of variables available for splitting at each tree node.This is the subset of input variables available to be used at each step.
+
+We will first find the right $mtry$ value for the Random Forest model by looping through all possible options in the credit dataset
+
+```{r}
+
+############### Random Forest #############
+
+
+# find most accurate mtry to use in modelling
+
+oob.err <- 0
+
+# loop through each variable index to obtain best mtry
+
+
+for(i in 1:23){
+  fit = randomForest(default_outcome ~ ., data = credit_df_carts, 
+                     subset=training_index, mtry=i, ntree = 500)
+  # oob error at the end of each model 
+  oob.err[i] = mean(fit$err.rate[,1])
+}
+
+
+```
+
+Plot the error rate for each mtry. Notice x is the best result....
+
+```{r}
+
+matplot(1:23, oob.err, pch = 23, col = "red", type = "b", ylab="Mean Squared Error", 
+        xlab = "mtry")
+legend("topright", legend = "OOB", pch = 23, col = "red")
+
+
+```
+
+mtry value that gives the most accurate model
+
+```{r}
+mtry <- which.min(oob.err)
+mtry
+
+```
+
+
+We can also look at tuning the number of trees to generate as part of the model. This is performed by starting with a large numbero see the point at which the errors stabalise and reducing the *ntree* parameter and running again until the optimal value is displayed.
+
+```{r}
+
+# 1,000 trees
+
+fit_1000 = randomForest(default_outcome ~ ., data = credit_df_carts, 
+                     subset=training_index, mtry=10, ntree = 1000)
+
+# 500 trees
+
+fit_500 = randomForest(default_outcome ~ ., data = credit_df_carts, 
+                     subset=training_index, mtry=10, ntree = 500)
+
+# 250 trees
+
+fit_250 = randomForest(default_outcome ~ ., data = credit_df_carts, 
+                     subset=training_index, mtry=10, ntree = 250)
+
+
+# Data frames for plotting
+
+
+# ntree 1000
+
+oob.error_1000 <- data.frame(
+  Trees=rep(1:nrow(fit_1000$err.rate)),
+  Error=c(fit_1000$err.rate[,"OOB"]),
+  fit_1000$err.rate[,"0"],
+  fit_1000$err.rate[,"1"])
+
+oob.error_1000 <- setNames(oob.error_1000, c("Trees","Error", "classification_0", "classification_1"))
+
+# ntree 500
+
+oob.error_500 <- data.frame(
+  Trees=rep(1:nrow(fit_500$err.rate)),
+  Error=c(fit_500$err.rate[,"OOB"]),
+  fit_500$err.rate[,"0"],
+  fit_500$err.rate[,"1"])
+
+oob.error_500 <- setNames(oob.error_500, c("Trees","Error", "classification_0", "classification_1"))
+
+# # ntree 250
+
+oob.error_250 <- data.frame(
+  Trees=rep(1:nrow(fit_250$err.rate)),
+  Error=c(fit_250$err.rate[,"OOB"]),
+  fit_250$err.rate[,"0"],
+  fit_250$err.rate[,"1"])
+
+oob.error_250 <- setNames(oob.error_250, c("Trees","Error", "classification_0", "classification_1"))
+
+
+library(reshape2)
+
+# melt df's for plotting
+
+melt_oob_1000 <- melt(oob.error_1000, id.vars = "Trees")
+melt_oob_500 <- melt(oob.error_500, id.vars = "Trees")
+melt_oob_250 <- melt(oob.error_250, id.vars = "Trees")
+
+melt_oob_1000 <- setNames(melt_oob_1000, c("Trees","Type", "Error"))
+melt_oob_500 <- setNames(melt_oob_500, c("Trees","Type", "Error"))
+melt_oob_250 <- setNames(melt_oob_250, c("Trees","Type", "Error"))
+
+library(ggplot2)
+
+# plot the errors for each ntree
+
+ggplot(data=melt_oob_1000, aes(x=Trees)) +
+  geom_line(aes(y = Error, color = Type))
+
+ggplot(data=melt_oob_500, aes(x=Trees)) +
+  geom_line(aes(y = Error, color = Type))
+
+ggplot(data=melt_oob_250, aes(x=Trees)) +
+  geom_line(aes(y = Error, color = Type))
+
+
+
+```
+
+We can see above that the number of trees doesn't really effect the model too much. We will set our ntree paremeter to 350 based on the error rate visible in red. We will also set mtry to the value that we found when testing the error rates.
+
+
+```{r}
+
+
+rf_model <- randomForest(default_outcome ~ ., data=credit_df_carts, 
+                          subset = training_index, mtry = mtry, 
+                         importance = TRUE, proximity=TRUE, ntree =350)
+
+# analysis out of bag estimates (OOB)
+
+rf_model
+
+# Predicting on train set
+
+train_set <- credit_df_carts[training_index,]
+
+rf_model_pred_train <- predict(rf_model, train_set, type = "class")
+
+# Predict on test set
+
+test_set <- credit_df_carts[test_index,]
+
+rf_model_pred_test <- predict(rf_model, test_set, type = "class")
+
+```
+
+We can observe the OOB error rate in the trained model which is 17.98%. As discussed above the OOB error is calculated using the Out of Bag Samples and this can give us an indication on how accurate the model can be. As to mitigate overfitting we need to test the model with unseen data. 
+
+### Display model summary and discuss the relationship between the response variable versus selected features.
+
+*MeanDecreaseAccuracy* is a measure of the extend at which a variable improves the accurace of the model in terms of classification. The higher the value then the higher importance the feature variable will have as it will contribute to higher model accuracy. 
+
+*MeanDecreaseGini* is another measure which assesses variable importance. As with MeanDecreaseAccuracy the higher the value the higher the importance will be for the variable in terms of successful classification.
+
+We plot the variables which are most important to the model. It is clear on both the MeanDecreaseAccuracy and MeanDecreaseGini plots that the variable PAY_0 is the most important variable of determining classification.
+
+```{r}
+
+# Variable importance/information gain 
+
+importance(rf_model)
+
+varImpPlot(rf_model,  
+           sort = T,
+           n.var=10,
+           main="Top 10 - Variable Importance")
+
+
+
+rf_model
+
+```
+
+
+### Summarise the error rates obtained from the training data. Comment on the error rates.
+
+
+
+As mentioned above, unseen data has been used in the model for classification. We can compare the results of these new classifications with the actual classifications to get an accuracy value for the model.
+
+```{r}
+
+# confusion matrix to validate model accuracy
+
+rf_cont_tab <- table(rf_model_pred_test, test_set$default_outcome)  
+rf_cont_tab
+
+```
+
+We can see that the accuracy of the model is 81.4%
+
+```{r}
+
+# accuracy
+
+rf_accuracy <- sum(diag(rf_cont_tab))/sum(rf_cont_tab)
+rf_accuracy
+
+```
+
+and the error rate is 18.6%
+
+```{r}
+# error rate
+
+rf_error <- 1 - rf_accuracy
+rf_error
+
+```

@@ -1,0 +1,422 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+# Question 1
+
+### Assumptions for Question 1 (a and b):
+
+- The rate at which events occur is constant i.e the probability of an event occurring at each time interval is the same.
+- The events are independent
+
+
+As lambda is the same for both questions we can plot PDF and CDF together to get a sense of probability values. There is a right skew in this plot with the long tail on the right. This is expected with lamba equaling 3 as the probability decreases as the x axis increases. 
+
+```{r}
+library(stats)
+library(ggplot2)
+
+# plot PMF and CFD
+
+options(scipen = 999, digits = 2) # sig digits
+events <- 0:15
+density <- dpois(x = events, lambda = 3)
+prob <- ppois(q=events, lambda=3, lower.tail = FALSE)
+df <- data.frame(events, density, prob)
+ggplot(df, aes(x = factor(events), y = density)) +
+  geom_col() +
+  geom_text(
+    aes(label = round(density,2), y = density + 0.01),
+    position = position_dodge(0.9),
+    size = 3,
+    vjust = 0
+  ) +
+  labs(title = "PMF and CDF of Poisson Distribution",
+       subtitle = "P(3).",
+       x = "Events (x)",
+       y = "Density") +
+  geom_line(data = df, aes(x = events, y = prob))
+
+
+```
+
+
+
+### 1(a) Let us assume that at any given time, the number of people waiting in a queue follows a Poisson distribution with mean of 3. What is the probability that 8 or more than 8 people are waiting in the queue? Show your working. (5 marks)
+
+
+
+Question 1(a)
+```{r}
+# Use poisson distribution 
+# Let x = 8 and lambda = 3
+# calculate the value of x CDF
+
+x <- ppois(q=8, lambda=3, lower.tail = FALSE)
+x
+
+
+```
+
+
+### 1(b) At the James Cook University, approximately 15 % of students are international. Consider a group of 20 students in MA5832. What is the probability of having 5 or less than 5 international students in the MA5832? State underlying assumptions if they are needed and show your working. (5 marks)
+
+
+```{r}
+
+# Use poisson distribution 
+# Let x = 5
+# lambda = 3 (15% of 20 students)
+# calculate the value of x CDF
+
+x <- ppois(q=5, lambda=3, lower.tail = FALSE)
+x
+
+```
+
+
+# Question 2
+
+In this question, we consider the marketing dataset from datarium package in R.
+
+The data contains 200 observations and 4 variables. The response variable is sales, de-noted as Y . The explanatory variables|measured in thousands of dollars|are advertising budget spent on youtube, newspapers and facebook, respectively, which are denoted as X1;X2 and X3, respectively. 
+
+To model the impact of the three media on sales, a researcher uses the following multiple linear regression:
+
+$Y=\beta_{0}+\beta_{1} X_{1}+\beta_{2} X_{2}+\beta_{3} X_{3}+\epsilon$ (1)
+$=\mathrm{X} \beta+\epsilon$ (2)
+
+where $Y;X1;X2$ and $X3$ is a vector of $n / 1$ (n is the number of observations in the dataset), $X = (1n;X1;X2;X3)$ and 
+
+$\beta=\left[\beta_{0}, \beta_{1}, \beta_{2}, \beta_{3}\right]^{\prime}$
+
+The parameter $\beta$ in Equation (2) and its standard deviation. $s.d()$ can be estimated by using the function $lm()$ in $R$. Alternatively, $\beta$ can be estimated by minimising the following loss function - mean squared errors:
+
+$\mathcal{L}=\frac{1}{n}(Y-\mathbf{X} \boldsymbol{\beta})^{\prime}(Y-\mathbf{X} \boldsymbol{\beta})=\frac{1}{n} \sum_{i=1}^{n}\left(Y_{i}-\mathbf{X}_{i} \boldsymbol{\beta}\right)^{2}$ (3)
+
+It is well-known that the optimal solution of $\beta$ in Equation (3), denoted as $\hat{\beta}$ has the following form:
+
+$\hat{\beta}=\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} Y$ (4)
+
+and its standard deviation is:
+
+$s.d(\hat{\boldsymbol{\beta}})=\sqrt{s^{2}\left(\mathrm{X}^{\prime} \mathbf{X}\right)^{-1}} \text {where } s^{2}=\frac{1}{n-4} \sum_{i=1}^{n}\left(Y_{i}-\mathbf{X}_{i} \hat{\boldsymbol{\beta}}\right)^{2}, i=1,2, \ldots, n$ (5)
+
+### 2(a) - Write a program in R to estimate \beta and its standard deviation using equations (4) and (5).
+
+```{r}
+
+library(pracma)
+library(datarium)
+
+# import data set
+data(marketing)
+class(marketing)
+
+#head
+head(marketing)
+```
+
+Plot the data and explore relationships
+
+```{r}
+
+plot(marketing)
+
+```
+
+Build the multiple linear regression model
+
+```{r}
+
+# Build the multiple linear regression model
+# Create response and explanatory variables
+
+n = length(marketing$sales)
+y = marketing$sales
+youtube <- marketing$youtube
+facebook <- marketing$facebook
+newspaper <- marketing$newspaper
+
+
+# Create design matrix
+
+x = cbind(Intercept = 1,youtube,facebook,newspaper)
+
+# Using equation (4) on task sheet - coefficient estimates
+
+
+B_hat = (solve(t(x)%*%x))%*%(t(x)%*%y)
+B_hat
+
+# Using equation (5) Calculate s2 so that std error cal be calculated
+
+s2 = sum((y - x%*%B_hat)^2)/(nrow(x)-ncol(x))
+
+# Covariance-Variance Matrix - diagonal represents the variance of each coefficient
+
+covar <- s2*inv((t(x)%*%x))
+d = diag(covar)
+
+# Coefficient estimate of standard errors/standard deviation (square root diagonal elements of the covariance matrix)
+
+st_error = sqrt(diag(covar))
+
+# use LM function for linear modelling and comparison between manual calculation
+
+lm <- lm(sales ~., data = marketing)
+
+# std.error for comparison
+
+lm_se <- sqrt(diag(vcov(lm)))
+
+
+```
+
+### 2(b) - Compare the results obtained in Question 2(a) with those obtained from the function $lm()$.
+
+Results between the two methods are identical
+
+```{r}
+
+# create comparison table
+
+comparison_df <- cbind(B_hat, lm$coefficients, st_error, lm_se)
+colnames(comparison_df) <- c("manual coefficients", "lm coefficients", "manual st_error", "lm Std. Error")
+comparison_df
+
+```
+
+# Question 3
+
+### (a) - Another approach to estimate $\beta$ in Equation (3) is to use Classical Gradient Descent.
+
+### Deciding what loss function to use. 
+
+There are several options which are available and its important to understand whether your ML model is attempting to perform predictions based on regression or classification. As we are modelling linear regression MSE will be used as part of the loss function. 
+
+
+The loss function can be represented as $J_{m, b}=\frac{1}{N} \sum_{i=1}^{N}\left(Y_{i}^{\prime}-Y_{i}\right)^{2}$ with $m$ and $b$ being the functions parameters. The aim of gradient descent is to find the values of m and b where the error is the lowest. 
+
+
+### Calculating the derivative of the loss function
+
+We will compute the derivative of this function so that we are able to find the minimum of the function i.e the local minima. Gradient descent uses derivatives to decide whether to increase or decrease the weights in order to increase or decrease the objective function
+
+## Procedure
+
+There are 4 main steps in calculating classical gradient descent. 
+
+**Step 1 - set starting point**
+
+$x^{(k)},$ set $k=0$
+
+This is the starting point for the algorithm and can be an arbitrary number. This specific model starts as 0.
+
+
+**Step 2 - Compute gradient of the loss with respect to parameters (variables in x)**
+
+This can be represented as $\nabla f\left(x^{(k)}\right)$ and is the derivative of the loss function
+
+**step 3 - Move parameters away from the gradient**
+
+This can be represented as $x^{(k+1)}=x^{(k)}-\alpha_{k} \nabla f\left(x^{(k)}\right)$ where $\alpha_{k}$ is the learning rate/step of the function. 
+
+**step 4 - Iterate **
+
+set $k=k+1$ and repeat a large number of times. 
+
+## (b) Write an R code to implement the Classical Gradient Descent procedure provided in Question 3(a).
+
+```{r}
+
+
+gd.lm<-function(x, y, alpha = 0.00002, max.iter=150000, changes=0.01){
+  start_time <- Sys.time()
+  print("Initialising")
+  
+  # Initialise matrices for storing gradient and coefficients
+  
+  # Coefficients
+  
+  p <- matrix(0, nrow=max.iter, ncol=ncol(x))
+  
+  # Gradients
+  
+  gradient <-matrix(0, nrow=max.iter, ncol=ncol(x))
+  
+  # Step 1
+  
+  # Set starting point in matrix
+  
+  p[1,] <- p[1,]<-rep(0,4)
+  
+  # Calculate gradient descent
+  
+  print("Processing")
+  for( i in 1:(max.iter-1)){
+    
+    # Update yhat with data from Gradient Descent approximation formula calculation
+    
+    yhat = p[i,1] + p[i,2]*x[,2] + p[i,3]*x[,3] + p[i,4]*x[,4]
+
+    # Step 2
+    
+    # Use product rule to calculate derivative of loss function (MSE) of coefficients & intercept
+    
+    gradient[i,1]<--2*mean(y-yhat)
+    gradient[i,2]<--2*mean(x[,2]*(y-yhat))
+    gradient[i,3]<--2*mean(x[,3]*(y-yhat))
+    gradient[i,4]<--2*mean(x[,4]*(y-yhat))
+    
+    # Step 3 & 4 Gradient Descent approximation formula
+    
+    p[i+1,1]<-p[i,1]-alpha*gradient[i,1]
+    p[i+1,2]<-p[i,2]-alpha*gradient[i,2]
+    p[i+1,3]<-p[i,3]-alpha*gradient[i,3]
+    p[i+1,4]<-p[i,4]-alpha*gradient[i,4]
+    
+    # Exit loop logic
+    
+    if(i > 1 & all(abs(gradient[i,]) < changes)){
+      i=i-1
+      break;
+    }
+  }
+  
+  # Processing time
+  
+  end_time <- Sys.time()
+  pt <- end_time - start_time
+  cat("Processed in", pt )
+  
+  # Return from function with results of the iterator, coefficient matrix and gradient matrix in list
+  
+  return(list("i"=i, "p"=p, "g"=gradient))
+}
+
+
+```
+
+### Running the model
+
+There are 5 arguments which can be passed into the function:
+
+**x** = matrix with intercept
+**y** = target variable vector with length = x
+**max.iter** = number of iterations to complete
+**alpha** = learning rate
+**changes** = threshold cost value to exit the loop
+
+$gd.lm(x, y, max.iter = 800000, alpha = 0.00002, changes = 0.01)$
+
+```{r}
+
+l <- gd.lm(x, y, max.iter = 800000, alpha = 0.00002)
+
+# Add coefficients to existing comparison table
+
+grad_desc <- data.frame(l$p[l$i,])
+colnames(grad_desc) <- c("gd_coefficients")
+comparison_df <- cbind(comparison_df, grad_desc)
+comparison_df <- comparison_df[, c(1, 2, 5, 3, 4)]
+
+```
+
+### Plot the cost function
+
+``` {r}
+# plot results
+
+par(mfrow=c(2,2))
+plot(l$p[l$i/2:l$i,1], type='l')
+plot(l$p[l$i/2:l$i,2], type='l') 
+plot(l$p[l$i/3:l$i,3], type='l')
+plot(l$p[l$i/4:l$i,4], type='l')
+
+
+```
+
+
+### (c) Compare the estimate of $\beta$ obtained in Question 3(b) with that obtained in Question 2(a). Provide some explanations if the results are similar or different.
+
+As you can see in the comparison table below the results between the lm(), manual coefficient calculation using $\hat{\beta}=\left(\mathbf{X}^{\prime} \mathbf{X}\right)^{-1} \mathbf{X}^{\prime} Y$ and the gradient descent method using $x^{(k+1)}=x^{(k)}-\alpha_{k} \nabla f\left(x^{(k)}\right)$ are all very similar. More time could be spent on refining the learning rate and the number of iterations when calling the gradient descent function. An improvement to this model would also be to use scaled data. This function is sensitive to these arguments however this is likely to have an impact on the performance of the function. 
+
+```{r}
+
+comparison_df
+
+```
+
+# Question 4
+
+### Compare the optimisation algorithms of Classical Gradient Descent, Stochastic Gradient Descent and Newton's methods to see advantages and disadvantages of each algorithm.
+
+### Classical Gradient Descent (CGD)
+
+Gradient descent is a broadly used first order optimisation technique which determines a local minima for a differentiable function. i.e it uses derivatives to decide whether to increase or decrease the weights in order to increase or decrease the objective function. 
+
+It is an iterative process which is repeated until convergence which can be represented as:
+
+$x^{(k+1)}=x^{(k)}-\alpha_{k} \nabla f\left(x^{(k)}\right)$ 
+
+where $\alpha_{k}$ is the learning rate/step of the function. 
+
+It starts at a random point on the function and using the formula above will take steps until it reaches the lowest point of the function i.e the local minima.
+
+There is somewhat of a challenge when executing the gradient descent function(s) as they are sensitive to the learning rate. If your learning rate is too low the model will be inefficient and slow as each step is too small. Conversely if the learning rate is too high it can cause divergence in within the loss function
+
+![Alt text](/Users/david/OneDrive/University/Data Mining and Machine Learning/Assessment 1/learning_rate.PNG)
+**Advantages**
+
+- High degree of accuracy 
+- Simple model to use and only uses first order derivatives
+
+
+**Disadvantages**
+
+- Convergence rate is slow
+- Model is inefficient and redundant computation is executed
+
+### Stochastic Gradient Descent (SGD)
+
+Stochastic gradient descent is a version of classic gradient descent in which random samples for each iteration are selected. Once the sample is selected then only it is used as part of the Gradient Descent approximation formula as opposed to all samples as in CGD. 
+
+When using big data, the number of calculations required at each iteration become too large with today's computer processing power using CGD. For example, if there was a dataset in which a linear regression model was being produced that had $1,000$ variables and $1,000,000$ samples the model would then have to calculate $1,000,000$ terms for each $1,000$ variables per iteration. If $1,000$  iterations were executed the model would then have to compute $100,000,000,000$ terms.
+
+Using the above example with $1,000,000$ observations, the stochastic model would reduce the number of terms to be calculated in the model by a factor of $1,000,000$, as for each iteration the SGD model continues from only the latest values calculated. 
+
+There are also sub types of SGD in which mini batching or sub sampling at each iteration is used.
+
+**Advantages**
+
+- Much faster performance compared with CGD
+- No redundant computation
+
+
+**Disadvantages**
+
+- Model is less accurate than CGD
+- The steps taken towards the minima are inconsistent and can lead to the gradient descent into other directions.
+
+### Newton’s Method
+
+Newtons method is an optimisaion technique that uses a second order polynomial method that uses first and second differentiation of a function to determine optimisation. 
+
+The Hessian matrix is a square matrix of second order partial derivatives of a scalar function with respect to $x_{1}, x_{2}, \dots, x_{n}$. Newtons method is calculated by replacing the learning rate by the inverse of the Hessian matrix and can be represented as $x^{(k+1)}=x^{(k)}-F\left(x^{(k)}\right)^{-1} \nabla f\left(x^{(k)}\right)$
+
+The main difference between CGD and Newton's is that Newtons is a root finding algorithm and it maximises a function using its second derivative (Hessian Matrix).
+
+**Advantages**
+
+- Quadratic approach to convergence. If the initial point is close to the minimum, then convergence will occur much faster than classical gradient descent. 
+
+
+**Disadvantages**
+
+- Not guaranteed that Newton's method will converge if the selected starting point is too far from the exact root.
+- Requires a lot of computer resources to process 
+
+
+
